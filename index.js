@@ -1,3 +1,7 @@
+// Adsgram SDK Yükleme
+const script = document.createElement('script');
+script.src = 'https://adsgram.ai/js/adsgram-ad-sdk.js';
+document.head.appendChild(script);
 const { Telegraf, Markup } = require('telegraf');
 const mongoose = require('mongoose');
 
@@ -118,3 +122,17 @@ bot.launch()
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// Adsgram Reklam Fonksiyonu
+function showRewardAd() {
+  if (window.Adsgram) {
+    const AdController = window.Adsgram.init({ blockId: "38592" });
+
+    AdController.show().then((result) => {
+      alert("Tebrikler! Reklamı izlediniz.");
+    }).catch((result) => {
+      console.log("Reklam gösterilemedi veya kapatıldı:", result);
+    });
+  } else {
+    alert("Reklam yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
+  }
+}
