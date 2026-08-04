@@ -136,3 +136,16 @@ function showRewardAd() {
     alert("Reklam yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
   }
 }
+// Otomatik Reklam Butonu Olusturucu
+document.addEventListener("DOMContentLoaded", function () {
+  // Ekranin en altina "Reklam Izle" butonu ekler
+  const btn = document.createElement("button");
+  btn.innerText = "🎬 Reklam İzle (Puan Kazan)";
+  btn.style.cssText = "width: 100%; padding: 15px; margin-top: 20px; background-color: #0088cc; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;";
+  
+  btn.onclick = function () {
+    showRewardAd();
+  };
+
+  document.body.appendChild(btn);
+});
