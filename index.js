@@ -1,24 +1,115 @@
-// Adsgram SDK Yükleme
-const script = document.createElement('script');
-script.src = 'https://adsgram.ai/js/adsgram-ad-sdk.js';
-document.head.appendChild(script);
+const express = require('express');
 const { Telegraf, Markup } = require('telegraf');
 const mongoose = require('mongoose');
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const MONGO_URI = process.env.MONGO_URI;
+const PORT = process.env.PORT || 3000;
 
 if (!BOT_TOKEN || !MONGO_URI) {
   console.error('HATA: BOT_TOKEN veya MONGO_URI eksik!');
   process.exit(1);
 }
 
+// ------------------------------------
+// 1. WEB SUNUCUSU VE MINI APP EKRANI
+// ------------------------------------
+const app = express();
+
+const htmlPage = `
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PuanBox Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://adsgram.ai/js/adsgram-ad-sdk.js"></script>
+  <style>
+    body {
+      background-color: #1c1c1e;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .card {
+      background-color: #2c2c2e;
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 350px;
+    }
+    h1 { margin-top: 0; font-size: 22px; color: #34c759; }
+    p { color: #aeaeb2; font-size: 14px; }
+    .btn {
+      background-color: #007aff;
+      color: white;
+      border: none;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      width: 100%;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    .btn:active { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎁 PuanBox Kazan</h1>
+    <p>Reklam izleyerek anında PB bakiyesi kazanabilirsin.</p>
+    <button class="btn" onclick="showRewardAd()">🎬 Reklam İzle (Puan Kazan)</button>
+  </div>
+
+  <script>
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+
+    function showRewardAd() {
+      if (window.Adsgram) {
+        const AdController = window.Adsgram.init({ blockId: "38592" });
+
+        AdController.show().then((result) => {
+          alert("🎉 Tebrikler! Reklamı başarıyla izlediniz.");
+        }).catch((result) => {
+          console.log("Reklam tamamlanamadı veya kapatıldı:", result);
+        });
+      } else {
+        alert("⚠️ Adsgram yükleniyor, lütfen 3 saniye sonra tekrar deneyin.");
+      }
+    }
+  </script>
+</body>
+</html>
+`;
+
+// Mini App adresleri çağrıldığında HTML sayfasını gönder
+app.get('/', (req, res) => res.send(htmlPage));
+app.get('/index.html', (req, res) => res.send(htmlPage));
+
+app.listen(PORT, () => {
+  console.log(`🌐 Web Sunucusu ${PORT} portunda çalışıyor.`);
+});
+
+// ------------------------------------
+// 2. MONGO DB VE TELEGRAM BOTU
+// ------------------------------------
 const bot = new Telegraf(BOT_TOKEN);
 
-// MongoDB Bağlantı Ayarları
-mongoose.connect(MONGO_URI, {
-  serverSelectionTimeoutMS: 5000
-})
+mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
   .then(() => console.log('✅ MongoDB Bağlantısı Başarılı!'))
   .catch(err => console.error('❌ MongoDB Bağlantı Hatası:', err.message));
 
@@ -68,9 +159,9 @@ bot.start(async (ctx) => {
       `Kazanmaya başlamak için aşağıdaki butonları kullan!`;
 
     return ctx.replyWithMarkdown(welcomeText, Markup.inlineKeyboard([
+      [Markup.button.webApp('🚀 Uygulamayı Aç (Reklam İzle)', 'https://puanbox-bot.onrender.com')],
       [Markup.button.callback('📅 Günlük Bonus (+100 PB)', 'daily_bonus')],
       [Markup.button.callback('🎡 Şans Çarkı', 'spin_wheel')],
-      [Markup.button.callback('📺 Reklam İzle (+50 PB)', 'watch_ad')],
       [Markup.button.callback('👥 Arkadaşını Davet Et', 'referral')],
       [Markup.button.callback('💎 Airdrop / Çekim (Kilitli)', 'withdraw')]
     ]));
@@ -122,30 +213,3 @@ bot.launch()
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-// Adsgram Reklam Fonksiyonu
-function showRewardAd() {
-  if (window.Adsgram) {
-    const AdController = window.Adsgram.init({ blockId: "38592" });
-
-    AdController.show().then((result) => {
-      alert("Tebrikler! Reklamı izlediniz.");
-    }).catch((result) => {
-      console.log("Reklam gösterilemedi veya kapatıldı:", result);
-    });
-  } else {
-    alert("Reklam yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
-  }
-}
-// Otomatik Reklam Butonu Olusturucu
-document.addEventListener("DOMContentLoaded", function () {
-  // Ekranin en altina "Reklam Izle" butonu ekler
-  const btn = document.createElement("button");
-  btn.innerText = "🎬 Reklam İzle (Puan Kazan)";
-  btn.style.cssText = "width: 100%; padding: 15px; margin-top: 20px; background-color: #0088cc; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;";
-  
-  btn.onclick = function () {
-    showRewardAd();
-  };
-
-  document.body.appendChild(btn);
-});
