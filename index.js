@@ -8,7 +8,7 @@ const MONGO_URI = process.env.MONGO_URI;
 
 // REKLAM DIRECT LINK'LERI (Render Environment'tan Çekilir)
 const MONETAG_LINK = process.env.MONETAG_LINK || 'https://omg10.com/4/11507575';
-const ADSTERRA_LINK = process.env.ADSTERRA_LINK || MONETAG_LINK; // Adsterra yoksa Monetag çalışır
+const ADSTERRA_LINK = process.env.ADSTERRA_LINK || MONETAG_LINK;
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
@@ -21,7 +21,7 @@ const userSchema = new mongoose.Schema({
   telegramId: { type: Number, required: true, unique: true },
   firstName: String,
   username: String,
-  pbBalance: { type: Number, default: 100 }, // Başlangıç bonusu
+  pbBalance: { type: Number, default: 100 },
   refCode: String,
   referredBy: Number,
   
@@ -33,10 +33,16 @@ const userSchema = new mongoose.Schema({
 
   // Raffle (Çekiliş)
   dailyRaffleTickets: { type: Number, default: 0 },
-  totalRaffleTickets: { type: Number, default: 0 }
+  totalRaffleTickets: { type: Number, default: 0 },
+
+  // Ad Timers
+  lastAdRewardTime: { type: Date, default: null }
 });
 
 const User = mongoose.model('User', userSchema);
+
+// Aktif otomatik ödül bekleyen kullanıcıların listesi (Spam engellemek için)
+const pendingAdRewards = new Set();
 
 // --- GECE 00:00 GÜNLÜK BİLET LİMİTİ SIFIRLAMA ---
 cron.schedule('0 0 * * *', async () => {
@@ -78,7 +84,6 @@ bot.onText(/\/start(?:\s+(.+))?/, async (msg, match) => {
       let referredBy = null;
       if (refPayload && !isNaN(refPayload) && parseInt(refPayload) !== chatId) {
         referredBy = parseInt(refPayload);
-        // Referans verene bonus ekleme
         await User.findOneAndUpdate(
           { telegramId: referredBy },
           { $inc: { pbBalance: 250 } }
@@ -221,20 +226,20 @@ bot.on('callback_query', async (query) => {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '📺 Reklam İzle (Süreyi Sıfırla)', url: MONETAG_LINK }],
+            [{ text: '📺 Reklam İzle', url: MONETAG_LINK }],
             [{ text: '◀️ Ana Menü', callback_data: 'menu_main' }]
           ]
         }
       });
     } else {
-      const waitText = `⏳ **Zar Hakkın Henüz Dolmadı!**\n\nYeni zar atabilmek için **${remainingMinutes} dakika** beklemelisin.\n\n*Beklemek istemiyorsan reklam izleyerek hakkını sıfırlayabilirsin:*`;
+      const waitText = `⏳ **Zar Hakkın Henüz Dolmadı!**\n\nYeni zar atabilmek için **${remainingMinutes} dakika** beklemelisin.`;
       bot.editMessageText(waitText, {
         chat_id: chatId,
         message_id: messageId,
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
-            [{ text: '⚡ Reklam İzle & Hakkı Sıfırla', url: MONETAG_LINK }],
+            [{ text: '⚡ Reklam İzle', url: MONETAG_LINK }],
             [{ text: '🔄 Kontrol Et', callback_data: 'menu_dice' }],
             [{ text: '◀️ Ana Menü', callback_data: 'menu_main' }]
           ]
@@ -249,13 +254,11 @@ bot.on('callback_query', async (query) => {
       `🏆 **Ödül:** 25.000 PB\n` +
       `🎫 **Senin Toplam Biletin:** \`${user.totalRaffleTickets}\`\n` +
       `📊 **Bugün Aldığın Bilet:** \`${user.dailyRaffleTickets} / 5\`\n\n` +
-      `*Aşağıdaki reklam bağlantılarına tıklayarak her tıklamada +1 Çekiliş Bileti kazanabilirsin (Günde Max 5 Bilet).*`;
+      `*Aşağıdaki reklam butonuna basıp linki açtığında biletin 10 saniye sonra **otomatik** hesabına tanımlanacaktır (Günde Max 5 Bilet).*`;
 
     let keyboard = [];
     if (user.dailyRaffleTickets < 5) {
-      keyboard.push([{ text: '🎟️ Monetag Reklamı İzle (+1 Bilet)', url: MONETAG_LINK }]);
-      keyboard.push([{ text: '🎟️ Adsterra Reklamı İzle (+1 Bilet)', url: ADSTERRA_LINK }]);
-      keyboard.push([{ text: '✅ Reklam İzledim (+1 Bilet Al)', callback_data: 'claim_ticket' }]);
+      keyboard.push([{ text: '🎟️ Reklam İzle & Bilet Kazan', callback_data: 'auto_raffle_ad' }]);
     } else {
       raffleText += `\n\n✅ **Bugünkü 5 bilet limitine ulaştın! Yarın tekrar gel.**`;
     }
@@ -270,22 +273,51 @@ bot.on('callback_query', async (query) => {
     });
   }
 
-  if (data === 'claim_ticket') {
-    if (user.dailyRaffleTickets < 5) {
-      user.dailyRaffleTickets += 1;
-      user.totalRaffleTickets += 1;
-      user.pbBalance += 50;
-      await user.save();
-      bot.answerCallbackQuery(query.id, { text: '🎟️ +1 Bilet Ve +50 PB Hesabına Eklendi!' });
-      bot.emit('callback_query', { ...query, data: 'menu_raffle' });
+  // --- OTOMATİK BİLET SİSTEMİ ---
+  if (data === 'auto_raffle_ad') {
+    if (pendingAdRewards.has(chatId)) {
+      return bot.answerCallbackQuery(query.id, { text: '⏳ Zaten devam eden bir reklam işleminiz var. Lütfen bekleyin.', show_alert: true });
     }
+
+    if (user.dailyRaffleTickets >= 5) {
+      return bot.answerCallbackQuery(query.id, { text: '⚠️ Bugünkü bilet limitine ulaştınız.', show_alert: true });
+    }
+
+    pendingAdRewards.add(chatId);
+    bot.answerCallbackQuery(query.id, { text: '🔗 Reklam açılıyor, 10 saniye sonra biletiniz otomatik eklenecektir!' });
+
+    // Kullanıcıya reklam linkini gönder
+    bot.sendMessage(chatId, `👉 Reklamı görüntülemek için tıklayın:\n${MONETAG_LINK}\n\n⏳ *10 saniye sonra biletiniz otomatik tanımlanacaktır...*`, { parse_mode: 'Markdown' });
+
+    // 10 Saniye Sonra Otomatik Bakiyeyi Ver
+    setTimeout(async () => {
+      try {
+        let u = await User.findOne({ telegramId: chatId });
+        if (u && u.dailyRaffleTickets < 5) {
+          u.dailyRaffleTickets += 1;
+          u.totalRaffleTickets += 1;
+          u.pbBalance += 50;
+          await u.save();
+
+          bot.sendMessage(chatId, `🎉 **Tebrikler!** Reklam izleme doğrulandı.\n🎫 **+1 Çekiliş Bileti** ve **+50 PB** hesabınıza otomatik yüklendi!`, {
+            reply_markup: {
+              inline_keyboard: [[{ text: '🎟️ Çekiliş Sayfasına Dön', callback_data: 'menu_raffle' }]]
+            }
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        pendingAdRewards.delete(chatId);
+      }
+    }, 10000); // 10000 ms = 10 saniye
   }
 
-  // --- REKLAM İZLE - KAZAN ---
+  // --- REKLAM İZLE - KAZAN (OTOMATİK PUAN) ---
   if (data === 'menu_ads') {
     const adsText = `📺 **PuanBox İzle - Kazan**\n\n` +
-      `Aşağıdaki sponsor reklam bağlantılarına tıklayarak **+100 PB** kazanabilirsin!\n\n` +
-      `*Tıkladıktan sonra "✅ Ödülü Al" butonuna basmayı unutma.*`;
+      `Aşağıdaki reklama tıkladıktan 10 saniye sonra **+100 PB** hesabına **otomatik** aktarılacaktır!\n\n` +
+      `*1 Saat arayla yeni reklam izleyebilirsin.*`;
 
     bot.editMessageText(adsText, {
       chat_id: chatId,
@@ -293,19 +325,57 @@ bot.on('callback_query', async (query) => {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '📺 Sponsor 1 (Monetag)', url: MONETAG_LINK }],
-          [{ text: '📺 Sponsor 2 (Adsterra)', url: ADSTERRA_LINK }],
-          [{ text: '✅ Ödülü Al (+100 PB)', callback_data: 'claim_ad_reward' }],
+          [{ text: '📺 Reklama Tıkla & Kazan (+100 PB)', callback_data: 'auto_claim_ad' }],
           [{ text: '◀️ Ana Menü', callback_data: 'menu_main' }]
         ]
       }
     });
   }
 
-  if (data === 'claim_ad_reward') {
-    user.pbBalance += 100;
-    await user.save();
-    bot.answerCallbackQuery(query.id, { text: '🎉 +100 PB Hesabına Yüklendi!' });
+  if (data === 'auto_claim_ad') {
+    const now = new Date();
+
+    if (pendingAdRewards.has(chatId)) {
+      return bot.answerCallbackQuery(query.id, { text: '⏳ Zaten işlemde olan bir reklamınız var. Lütfen 10 saniye bekleyin.', show_alert: true });
+    }
+
+    // 1 Saatlik Cooldown kontrolü
+    if (user.lastAdRewardTime) {
+      const diffMs = now - new Date(user.lastAdRewardTime);
+      const oneHourMs = 60 * 60 * 1000;
+      if (diffMs < oneHourMs) {
+        const remainingMinutes = Math.ceil((oneHourMs - diffMs) / (1000 * 60));
+        return bot.answerCallbackQuery(query.id, { text: `⏳ Yeni reklam izlemek için ${remainingMinutes} dakika beklemelisin.`, show_alert: true });
+      }
+    }
+
+    pendingAdRewards.add(chatId);
+    bot.answerCallbackQuery(query.id, { text: '🔗 Reklam açılıyor! Ödülünüz 10 saniye sonra otomatik yüklenecektir.' });
+
+    // Kullanıcıya reklam linkini gönder
+    bot.sendMessage(chatId, `👉 Reklam sayfasını açmak için tıklayın:\n${MONETAG_LINK}\n\n⏳ *10 saniye sonra +100 PB hesabınıza aktarılacaktır...*`, { parse_mode: 'Markdown' });
+
+    // 10 Saniye Sonra Otomatik Bakiyeyi Ver
+    setTimeout(async () => {
+      try {
+        let u = await User.findOne({ telegramId: chatId });
+        if (u) {
+          u.pbBalance += 100;
+          u.lastAdRewardTime = new Date();
+          await u.save();
+
+          bot.sendMessage(chatId, `🎉 **Tebrikler!** Reklam izleme tamamlandı.\n💰 **+100 PB** hesabınıza otomatik yüklendi!`, {
+            reply_markup: {
+              inline_keyboard: [[{ text: '💰 Bakiyemi Gör', callback_data: 'menu_profile' }]]
+            }
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        pendingAdRewards.delete(chatId);
+      }
+    }, 10000); // 10 saniye
   }
 
   // --- REFERANS SİSTEMİ ---
