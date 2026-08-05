@@ -12,108 +12,8 @@ if (!BOT_TOKEN || !MONGO_URI) {
 }
 
 // ------------------------------------
-// 1. WEB SUNUCUSU VE MINI APP EKRANI
+// 1. MONGO DB MODELİ
 // ------------------------------------
-const app = express();
-
-const htmlPage = `
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PuanBox Mini App</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      background-color: #1c1c1e;
-      color: #ffffff;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 20px;
-    }
-    .card {
-      background-color: #2c2c2e;
-      border-radius: 16px;
-      padding: 24px;
-      text-align: center;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      width: 100%;
-      max-width: 350px;
-    }
-    h1 { margin-bottom: 12px; font-size: 22px; color: #34c759; }
-    p { color: #aeaeb2; font-size: 14px; margin-bottom: 20px; }
-    .btn {
-      background-color: #007aff;
-      color: white;
-      border: none;
-      padding: 16px 20px;
-      border-radius: 12px;
-      font-size: 16px;
-      font-weight: bold;
-      width: 100%;
-      cursor: pointer;
-    }
-    .btn:active { opacity: 0.8; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>🎁 PuanBox Kazan</h1>
-    <p>Reklam izleyerek anında PB bakiyesi kazanabilirsin.</p>
-    <button class="btn" onclick="showRewardAd()">🎬 Reklam İzle (Puan Kazan)</button>
-  </div>
-
-  <script>
-    // Telegram Web App Ilklendirme
-    window.addEventListener('DOMContentLoaded', () => {
-      if (window.Telegram && window.Telegram.WebApp) {
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
-      }
-    });
-
-    function showRewardAd() {
-      if (window.Adsgram) {
-        const AdController = window.Adsgram.init({ blockId: "41318" });
-
-        AdController.show().then((result) => {
-          alert("🎉 Tebrikler! Reklamı başarıyla izlediniz.");
-        }).catch((result) => {
-          console.log("Reklam tamamlanamadı veya kapatıldı:", result);
-        });
-      } else {
-        alert("⚠️ Adsgram kütüphanesi yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
-      }
-    }
-  </script>
-</body>
-</html>
-`;
-
-// Mini App adresleri çağrıldığında HTML sayfasını gönder
-app.get('/', (req, res) => res.send(htmlPage));
-app.get('/index.html', (req, res) => res.send(htmlPage));
-
-app.listen(PORT, () => {
-  console.log(`🌐 Web Sunucusu ${PORT} portunda çalışıyor.`);
-});
-
-// ------------------------------------
-// 2. MONGO DB VE TELEGRAM BOTU
-// ------------------------------------
-const bot = new Telegraf(BOT_TOKEN);
-
 mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
   .then(() => console.log('✅ MongoDB Bağlantısı Başarılı!'))
   .catch(err => console.error('❌ MongoDB Bağlantı Hatası:', err.message));
@@ -128,6 +28,11 @@ const UserSchema = new mongoose.Schema({
 });
 
 const User = mongoose.model('User', UserSchema);
+
+// ------------------------------------
+// 2. TELEGRAM BOTU
+// ------------------------------------
+const bot = new Telegraf(BOT_TOKEN);
 
 bot.start(async (ctx) => {
   try {
@@ -215,6 +120,153 @@ bot.action('referral', async (ctx) => {
 bot.launch()
   .then(() => console.log('🚀 PuanBox Botu Aktif ve Dinliyor!'))
   .catch(err => console.error('Bot Başlatma Hatası:', err));
+
+// ------------------------------------
+// 3. WEB SUNUCUSU VE MINI APP EKRANI
+// ------------------------------------
+const app = express();
+app.use(express.json());
+
+const htmlPage = `
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PuanBox Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #1c1c1e;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background-color: #2c2c2e;
+      border-radius: 16px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 350px;
+    }
+    h1 { margin-bottom: 12px; font-size: 22px; color: #34c759; }
+    p { color: #aeaeb2; font-size: 14px; margin-bottom: 20px; }
+    .btn {
+      background-color: #007aff;
+      color: white;
+      border: none;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      width: 100%;
+      cursor: pointer;
+    }
+    .btn:active { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎁 PuanBox Kazan</h1>
+    <p>Reklam izleyerek anında PB bakiyesi kazanabilirsin.</p>
+    <button class="btn" onclick="showRewardAd()">🎬 Reklam İzle (Puan Kazan)</button>
+  </div>
+
+  <script>
+    let telegramId = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+        
+        const initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
+        if (initDataUnsafe && initDataUnsafe.user) {
+          telegramId = initDataUnsafe.user.id.toString();
+        }
+      }
+    });
+
+    function showRewardAd() {
+      if (window.Adsgram) {
+        const AdController = window.Adsgram.init({ blockId: "41318" });
+
+        AdController.show().then((result) => {
+          // Reklam izlendi, backend'e bildir
+          fetch('/api/reward', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegramId: telegramId })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if(data.success) {
+              alert("🎉 Tebrikler! 100 PB hesabınıza yüklendi.");
+            } else {
+              alert("Reklam izlendi fakat puan yüklenirken bir sorun oluştu.");
+            }
+          })
+          .catch(err => console.error("Ödül Hatası:", err));
+
+        }).catch((result) => {
+          console.log("Reklam tamamlanamadı veya kapatıldı:", result);
+        });
+      } else {
+        alert("⚠️ Adsgram kütüphanesi yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
+      }
+    }
+  </script>
+</body>
+</html>
+`;
+
+// Reklam Sonu Ödül Ekleme ve Bildirim Gönderme API'si
+app.post('/api/reward', async (req, res) => {
+  try {
+    const { telegramId } = req.body;
+    if (!telegramId) {
+      return res.status(400).json({ success: false, message: 'Telegram ID bulunamadı.' });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { telegramId },
+      { $inc: { pbBalance: 100, dailyAdCount: 1 } },
+      { new: true }
+    );
+
+    if (user) {
+      // Telegram üzerinden kullanıcıya otomatik bildirim mesajı at
+      const msg = `🎉 *Reklam Ödülü Yüklendi!*\n\n` +
+                  `➕ *Kazanılan:* \`+100 PB\`\n` +
+                  `💰 *Yeni Bakiye:* \`${user.pbBalance.toLocaleString()} PB\`\n` +
+                  `📺 *Bugünkü İzleme:* \`${user.dailyAdCount} / 50\``;
+      
+      bot.telegram.sendMessage(telegramId, msg, { parse_mode: 'Markdown' }).catch(() => {});
+      return res.json({ success: true, balance: user.pbBalance, count: user.dailyAdCount });
+    }
+
+    return res.status(444).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+  } catch (err) {
+    console.error('API Ödül Hatası:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/', (req, res) => res.send(htmlPage));
+app.get('/index.html', (req, res) => res.send(htmlPage));
+
+app.listen(PORT, () => {
+  console.log(`🌐 Web Sunucusu ${PORT} portunda çalışıyor.`);
+});
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
