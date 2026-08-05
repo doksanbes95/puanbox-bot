@@ -24,7 +24,7 @@ const htmlPage = `
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PuanBox Mini App</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://adsgram.ai/js/adsgram-ad-sdk.js"></script>
+  <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
   <style>
     body {
       background-color: #1c1c1e;
@@ -80,7 +80,7 @@ const htmlPage = `
 
     function showRewardAd() {
       if (window.Adsgram) {
-        const AdController = window.Adsgram.init({ blockId: "38592" });
+        const AdController = window.Adsgram.init({ blockId: "41318" });
 
         AdController.show().then((result) => {
           alert("🎉 Tebrikler! Reklamı başarıyla izlediniz.");
@@ -88,7 +88,7 @@ const htmlPage = `
           console.log("Reklam tamamlanamadı veya kapatıldı:", result);
         });
       } else {
-        alert("⚠️ Adsgram yükleniyor, lütfen 3 saniye sonra tekrar deneyin.");
+        alert("⚠️ Adsgram kütüphanesi yükleniyor, lütfen birkaç saniye sonra tekrar deneyin.");
       }
     }
   </script>
@@ -213,18 +213,3 @@ bot.launch()
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-// Adsgram Reklam Başlatma (Block ID: 41318)
-const AdController = window.Adsgram.init({ 
-    blockId: "41318" 
-});
-
-// Reklam Gösterme Fonksiyonu
-function izleVeKazan() {
-    AdController.show()
-        .then((result) => {
-            alert("Tebrikler! Reklamı izlediğiniz için ödülünüz hesabınıza tanımlandı.");
-        })
-        .catch((result) => {
-            console.log("Reklam tamamlanamadı:", result);
-        });
-}
