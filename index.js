@@ -213,3 +213,18 @@ bot.launch()
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+// Adsgram Reklam Başlatma (Block ID: 41318)
+const AdController = window.Adsgram.init({ 
+    blockId: "41318" 
+});
+
+// Reklam Gösterme Fonksiyonu
+function izleVeKazan() {
+    AdController.show()
+        .then((result) => {
+            alert("Tebrikler! Reklamı izlediğiniz için ödülünüz hesabınıza tanımlandı.");
+        })
+        .catch((result) => {
+            console.log("Reklam tamamlanamadı:", result);
+        });
+}
