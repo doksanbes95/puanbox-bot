@@ -21,11 +21,16 @@ const htmlPage = `
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PuanBox Mini App</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
   <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
     body {
       background-color: #1c1c1e;
       color: #ffffff;
@@ -34,10 +39,8 @@ const htmlPage = `
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
-      margin: 0;
+      min-height: 100vh;
       padding: 20px;
-      box-sizing: border-box;
     }
     .card {
       background-color: #2c2c2e;
@@ -48,8 +51,8 @@ const htmlPage = `
       width: 100%;
       max-width: 350px;
     }
-    h1 { margin-top: 0; font-size: 22px; color: #34c759; }
-    p { color: #aeaeb2; font-size: 14px; }
+    h1 { margin-bottom: 12px; font-size: 22px; color: #34c759; }
+    p { color: #aeaeb2; font-size: 14px; margin-bottom: 20px; }
     .btn {
       background-color: #007aff;
       color: white;
@@ -59,7 +62,6 @@ const htmlPage = `
       font-size: 16px;
       font-weight: bold;
       width: 100%;
-      margin-top: 20px;
       cursor: pointer;
     }
     .btn:active { opacity: 0.8; }
@@ -73,10 +75,13 @@ const htmlPage = `
   </div>
 
   <script>
-    if (window.Telegram && window.Telegram.WebApp) {
-      window.Telegram.WebApp.ready();
-      window.Telegram.WebApp.expand();
-    }
+    // Telegram Web App Ilklendirme
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.Telegram && window.Telegram.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      }
+    });
 
     function showRewardAd() {
       if (window.Adsgram) {
