@@ -198,11 +198,12 @@ const htmlPage = `
 
     function showRewardAd() {
       if (window.Adsgram) {
-        const AdController = window.Adsgram.init({ blockId: "41318" });
+        // Adsgram Canlı Block ID: 41322
+        const AdController = window.Adsgram.init({ blockId: "41322" });
 
         AdController.show().then((result) => {
-          // Reklam izlendi, backend'e bildir
-          fetch('/api/reward', {
+          // Reklam tamamlandığında kullanıcı ID'si ile backend'e bildir
+          fetch('/api/reward?userId=' + (telegramId || ''), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telegramId: telegramId })
@@ -229,22 +230,22 @@ const htmlPage = `
 </html>
 `;
 
-// Reklam Sonu Ödül Ekleme ve Bildirim Gönderme API'si
-app.post('/api/reward', async (req, res) => {
+// Reklam Sonu Ödül Ekleme ve Bildirim API'si (Hem Postback hem Mini App Uyumlu)
+app.use(['/api/reward'], async (req, res) => {
   try {
-    const { telegramId } = req.body;
+    const telegramId = req.query.userId || req.body.telegramId;
+
     if (!telegramId) {
-      return res.status(400).json({ success: false, message: 'Telegram ID bulunamadı.' });
+      return res.status(400).json({ success: false, message: 'Telegram ID (userId) bulunamadı.' });
     }
 
     const user = await User.findOneAndUpdate(
-      { telegramId },
+      { telegramId: telegramId.toString() },
       { $inc: { pbBalance: 100, dailyAdCount: 1 } },
       { new: true }
     );
 
     if (user) {
-      // Telegram üzerinden kullanıcıya otomatik bildirim mesajı at
       const msg = `🎉 *Reklam Ödülü Yüklendi!*\n\n` +
                   `➕ *Kazanılan:* \`+100 PB\`\n` +
                   `💰 *Yeni Bakiye:* \`${user.pbBalance.toLocaleString()} PB\`\n` +
@@ -254,7 +255,7 @@ app.post('/api/reward', async (req, res) => {
       return res.json({ success: true, balance: user.pbBalance, count: user.dailyAdCount });
     }
 
-    return res.status(444).json({ success: false, message: 'Kullanıcı bulunamadı.' });
+    return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı.' });
   } catch (err) {
     console.error('API Ödül Hatası:', err);
     return res.status(500).json({ success: false, error: err.message });
